@@ -14,6 +14,12 @@ The script depends on the yt-dlp package, which can be installed using pip:
 pip install yt-dlp
 
 ## Usage
+To use this script, replace USER_NAME in user_name with the YouTube user name of the user whose playlists you want to download from.
+
+The script will create a subfolder in download_dir for each of the user's public playlists, and will download videos from each playlist to its corresponding subfolder.
+
+The script will also save a separate prev_downloaded.json file in each playlist's subfolder to track which videos have been downloaded from that playlist, and will update the overall prev_downloaded.json file in the download directory to track which videos have been downloaded overall.
+
 Open the script file youtube_playlist_downloader.py in a text editor.
 Set the user_name and download_dir variables at the top of the file to the desired values.
 Save the file and exit the text editor.
