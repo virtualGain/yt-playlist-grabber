@@ -1,9 +1,11 @@
 #example usage: python "C:\Users\mikey\git-repos\yt-playlist-grabber\ytpg.py" elysiandreamz --download-dir /path/to/custom/download/directory
+#downloads videos from public playlist for given username and converts them to mp3 format adding id3 tags based on playlist and video naming standard
 
 import os
 import json
 import argparse
 import yt_dlp
+import datetime
 from music_tag import load_file
 
 def add_tags(file_path, title, playlist_name):
@@ -27,25 +29,14 @@ def add_tags(file_path, title, playlist_name):
     audio_file.save()
 
 def download_playlists(user_name, download_dir):
-    # Load previously downloaded video list from file
-    prev_downloaded_file = os.path.join(download_dir, "prev_downloaded.json")
-    if os.path.exists(prev_downloaded_file):
-        with open(prev_downloaded_file, "r") as f:
-            prev_downloaded = json.load(f)
-    else:
-        prev_downloaded = []
-
-    # Set yt-dlp options for MP3 conversion
     ytdlp_opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio",
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "320",
-        }],
-    }
-
-    # Initialize yt-dlp downloader
+            "format": "bestaudio[ext=m4a]/bestaudio",
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "320",
+            }],
+        }
     ytdl = yt_dlp.YoutubeDL(ytdlp_opts)
 
     # Get user's public playlists
@@ -57,6 +48,12 @@ def download_playlists(user_name, download_dir):
         playlist_dir = os.path.join(download_dir, playlist["title"])
         os.makedirs(playlist_dir, exist_ok=True)
 
+        # Set yt-dlp options for MP3 conversion
+        ytdl.params["outtmpl"] = os.path.join(playlist_dir, "%(title)s.%(ext)s")
+
+        # Initialize yt-dlp downloader
+        ytdl = yt_dlp.YoutubeDL(ytdlp_opts)
+
         # Load previously downloaded video list for this playlist
         playlist_downloaded_file = os.path.join(playlist_dir, "prev_downloaded.json")
         if os.path.exists(playlist_downloaded_file):
@@ -66,28 +63,25 @@ def download_playlists(user_name, download_dir):
             playlist_downloaded = []
 
         # Download videos from playlist
-        playlist_info = ytdl.extract_info(playlist["url"], download=False)
+        playlist_info = ytdl.extract_info(playlist["webpage_url"], download=False)
         for video in playlist_info["entries"]:
             # Check if video has already been downloaded
-            if video["id"] not in prev_downloaded and video["id"] not in playlist_downloaded:
+            if not any(playlist_downloaded_vids["video_id"] == video["id"] for playlist_downloaded_vids in playlist_downloaded):
                 # Download video and convert to MP3
-                ytdl.download([video["webpage_url"]], outtmpl=os.path.join(playlist_dir, "%(title)s.%(ext)s"))
+                ytdl.download([video["webpage_url"]])
 
                 # Add ID3 tags to MP3 file
                 mp3_file_path = os.path.join(playlist_dir, f"{video['title']}.mp3")
                 add_tags(mp3_file_path, video['title'], playlist["title"])
 
                 # Add video ID to previously downloaded list for both the playlist and overall downloaded lists
-                prev_downloaded.append(video["id"])
-                playlist_downloaded.append(video["id"])
+                playlist_downloaded.append({"video_title": video["title"],
+                                            "video_id": video["id"],
+                                            "dl_date": datetime.datetime.now().strftime("%B %d, %Y %H:%M:%S")})
 
         # Save updated previously downloaded video list for this playlist to file
         with open(playlist_downloaded_file, "w") as f:
             json.dump(playlist_downloaded, f)
-
-    # Save updated overall previously downloaded video list to file
-    with open(prev_downloaded_file, "w") as f:
-        json.dump(prev_downloaded, f)
 
 if __name__ == "__main__":
     # Set default download directory

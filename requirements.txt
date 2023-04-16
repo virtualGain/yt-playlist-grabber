@@ -1,2 +1,4 @@
+#ffmpeg and ffprobe exe's or binaries must be in your path
 yt-dlp==2022.02.18
 music-tag==0.5.2
+
