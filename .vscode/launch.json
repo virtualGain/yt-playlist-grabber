@@ -1,17 +1,31 @@
 {
     "version": "0.2.0",
-    "configurations": [
+    "configurations": [        
 
 
-        
-        {
-            "name": "Python: Current File",
-            "type": "python",
-            "request": "launch",
-            "program": "${file}",
-            "args": ["elysiandreamz"],
-            "console": "integratedTerminal",
-            "justMyCode": true
-        }
+    {
+        "name": "PowerShell Launch itunes ps1",
+        "type": "PowerShell",
+        "request": "launch",
+        "script": "./update_itunes_playlists.ps1",
+        "cwd": "${cwd}",
+        "args": ["C:\\Music\\ytpg"]
+    },
+    {
+        "name": "Python: Current File",
+        "type": "python",
+        "request": "launch",
+        "program": "${file}",
+        "args": ["elysiandreamz"],
+        "justMyCode": true
+    }
+    {
+        "name": "PowerShell Launch backup ps1",
+        "type": "PowerShell",
+        "request": "launch",
+        "script": "./backup_to_onedrive.ps1",
+        "cwd": "${cwd}",
+        "args": ["-SourceFolderPath", "C:\\Music", "-DestinationFolderName", "Music_Backup"]
+    },
     ]
 }

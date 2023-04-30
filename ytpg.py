@@ -11,7 +11,28 @@ import clr
 import subprocess
 from pathvalidate import sanitize_filename
 from music_tag import load_file
+from colorama import Fore, Style, init
 
+""" USE IN THE FUTURE TO MAKE FASTER/BETTER
+def get_playlists(user_name):
+    API_KEY = 'your_youtube_data_api_key'
+    YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3'
+    url = f"{YOUTUBE_API_BASE_URL}/channels?part=contentDetails&forUsername={user_name}&key={api_key}"
+    response = requests.get(url)
+    data = response.json()
+    
+    if 'items' not in data:
+        raise ValueError('Invalid user name or API key')
+    
+    channel_id = data['items'][0]['id']
+    
+    url = f"{YOUTUBE_API_BASE_URL}/playlists?part=snippet&channelId={channel_id}&maxResults=50&key={api_key}"
+    response = requests.get(url)
+    data = response.json()
+
+    playlist_urls = [f"https://www.youtube.com/playlist?list={item['id']}" for item in data['items']]
+    return playlist_urls
+"""
 def download_videos_from_pl(playlist, playlist_dir):
     # Load previously downloaded videos list for this playlist
     playlist_downloaded_file = os.path.join(playlist_dir, "prev_downloaded.json")
@@ -39,9 +60,11 @@ def download_videos_from_pl(playlist, playlist_dir):
                     "preferredquality": "320",
                 }],
                 "outtmpl": mp3_file_path + ".%(ext)s",
+                "ignorerrors": True,
             }
             ytdl = yt_dlp.YoutubeDL(ytdlp_opts)
             # Download video and convert to MP3 
+            print(Fore.YELLOW + f"Processing Video title: {video['title']}" + Style.RESET_ALL)
             ytdl.download([video['webpage_url']])
             # Add ID3 tags to MP3
             add_tags(mp3_file_path + ".mp3", safe_vid_title, playlist["title"])
@@ -53,7 +76,6 @@ def download_videos_from_pl(playlist, playlist_dir):
             # Save updated previously downloaded video list for this playlist to file
             with open(playlist_downloaded_file, "w") as f:
                 json.dump(playlist_downloaded, f)
-
 
 def add_crate_to_serato(playlist_name, directory_path):
     # Add the Serato SDK assembly to the .NET CLR
@@ -122,6 +144,7 @@ def download_playlists(user_name, download_dir):
                 "preferredquality": "320",
             }],
             "outtmpl": "%(title)s.%(ext)s".replace("\\", "/"),
+            "ignoreerrors": True,
         }
     ytdl = yt_dlp.YoutubeDL(ytdlp_opts)
 
@@ -131,6 +154,7 @@ def download_playlists(user_name, download_dir):
 
     # Download videos from each playlist
     for playlist in user_playlists_info["entries"]:
+        print(Fore.YELLOW + f"Processing Playlist title: {playlist['title']}" + Style.RESET_ALL)
         playlist_dir = os.path.join(download_dir, playlist["title"])
         os.makedirs(playlist_dir, exist_ok=True)
 
@@ -140,7 +164,7 @@ def download_playlists(user_name, download_dir):
         #add crate to serato DJ pro
         #add_crate_to_serato("ytpg_" + playlist["title"], playlist_dir )
 
-def run_powershell_script(script_path, directory_path):
+def run_itunes_powershell_script(script_path, directory_path):
     try:
         result = subprocess.run(
             ["powershell.exe", "-ExecutionPolicy", "Unrestricted", "-File", script_path, "-directoryPath", directory_path],
@@ -152,7 +176,22 @@ def run_powershell_script(script_path, directory_path):
     except subprocess.CalledProcessError as e:
         print(f"Error: Unable to update playlists")
 
+def run_backup_powershell_script(script_path, SourceFolderPath, DestinationFolderName):
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-ExecutionPolicy", "Unrestricted", "-File", script_path, "-SourceFolderPath", SourceFolderPath, "-DestinationFoldername", DestinationFolderName],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        print(result.stdout)
+    except subprocess.CalledProcessError as e:
+        print(f"Error: Unable to update playlists")
+
 if __name__ == "__main__":
+    import time
+    start_time = time.time()
+
     # Set default download directory
     default_download_dir = "c:\\music\\ytpg"
     if not os.path.exists(default_download_dir):
@@ -169,4 +208,19 @@ if __name__ == "__main__":
 
     # update itunes playlists
     powershell_script_path = "./update_itunes_playlists.ps1"
-    run_powershell_script(powershell_script_path, args.download_dir)
+    run_itunes_powershell_script(powershell_script_path, args.download_dir)
+    
+    # spit out the script runtime in minutes
+    end_time = time.time()
+    total_runtime = end_time - start_time
+    total_runtime_minutes = total_runtime / 60
+    print("Total runtime: {:.2f} minutes".format(total_runtime_minutes))
+
+    #backup our music folder
+    start_time = time.time()
+    run_backup_powershell_script("./backup_to_onedrive.ps1", "C:\Music", "Music_Backup")
+
+    end_time = time.time()
+    total_runtime = end_time - start_time
+    total_runtime_minutes = total_runtime / 60
+    print("Total runtime: {:.2f} minutes".format(total_runtime_minutes))
