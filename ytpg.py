@@ -11,7 +11,8 @@ import clr
 import subprocess
 from pathvalidate import sanitize_filename
 from music_tag import load_file
-from colorama import Fore, Style, init
+from colorama import Fore, Style
+global ERROR_LOGS_FILEPATH
 
 """ USE IN THE FUTURE TO MAKE FASTER/BETTER
 def get_playlists(user_name):
@@ -33,6 +34,15 @@ def get_playlists(user_name):
     playlist_urls = [f"https://www.youtube.com/playlist?list={item['id']}" for item in data['items']]
     return playlist_urls
 """
+
+def log_error_to_file(error_message):
+    #get time and add to message
+    now = datetime.datetime.now()
+    error_message = now.strftime('%Y-%m-%d %H:%M:%S') + ": " + error_message
+
+    with open(ERROR_LOGS_FILEPATH, "a") as log_file:
+        log_file.write(f"{error_message}\n")
+
 def download_videos_from_pl(playlist, playlist_dir):
     # Load previously downloaded videos list for this playlist
     playlist_downloaded_file = os.path.join(playlist_dir, "prev_downloaded.json")
@@ -44,38 +54,44 @@ def download_videos_from_pl(playlist, playlist_dir):
 
     #playlist_info = ytdl.extract_info(playlist["webpage_url"], download=False)
     for video in playlist["entries"]:
-        # Check if video has already been downloaded
-        if not any(playlist_downloaded_vids["video_id"] == video["id"] for playlist_downloaded_vids in playlist_downloaded):
-            
-            # Santize the filepath
-            safe_vid_title = sanitize_filename(video['title'])
-            mp3_file_path = os.path.join(playlist_dir, safe_vid_title).replace("\\","/")
+        if video is not None: 
+            # Check if video has already been downloaded
+            if not any(playlist_downloaded_vids["video_id"] == video["id"] for playlist_downloaded_vids in playlist_downloaded):
+                
+                # Santize the filepath
+                safe_vid_title = sanitize_filename(video['title'])
+                mp3_file_path = os.path.join(playlist_dir, safe_vid_title).replace("\\","/")
 
-            #reinit ytdl with updated path. Only way to sanitize filenames
-            ytdlp_opts = {
-                "format": "bestaudio[ext=m4a]/bestaudio",
-                "postprocessors": [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "320",
-                }],
-                "outtmpl": mp3_file_path + ".%(ext)s",
-                "ignorerrors": True,
-            }
-            ytdl = yt_dlp.YoutubeDL(ytdlp_opts)
-            # Download video and convert to MP3 
-            print(Fore.YELLOW + f"Processing Video title: {video['title']}" + Style.RESET_ALL)
-            ytdl.download([video['webpage_url']])
-            # Add ID3 tags to MP3
-            add_tags(mp3_file_path + ".mp3", safe_vid_title, playlist["title"])
-            # Add video ID to previously downloaded list for both the playlist and overall downloaded lists
-            playlist_downloaded.append({"video_title": safe_vid_title,
-                                        "video_id": video["id"],
-                                        "dl_date": datetime.datetime.now().strftime("%B %d, %Y %H:%M:%S")})
-            
-            # Save updated previously downloaded video list for this playlist to file
-            with open(playlist_downloaded_file, "w") as f:
-                json.dump(playlist_downloaded, f)
+                #reinit ytdl with updated path. Only way to sanitize filenames
+                ytdlp_opts = {
+                    "format": "bestaudio[ext=m4a]/bestaudio",
+                    "postprocessors": [{
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": "320",
+                    }],
+                    "outtmpl": mp3_file_path + ".%(ext)s",
+                    "ignorerrors": True,
+                    "quiet": True,
+                }
+                ytdl = yt_dlp.YoutubeDL(ytdlp_opts)
+                # Download video and convert to MP3 
+                print(Fore.YELLOW + f"Processing Video title: {video['title']}" + Style.RESET_ALL)
+                ytdl.download([video['webpage_url']])
+                # Add ID3 tags to MP3
+                add_tags(mp3_file_path + ".mp3", safe_vid_title, playlist["title"])
+                # Add video ID to previously downloaded list for both the playlist and overall downloaded lists
+                playlist_downloaded.append({"video_title": safe_vid_title,
+                                            "video_id": video["id"],
+                                            "dl_date": datetime.datetime.now().strftime("%B %d, %Y %H:%M:%S")})
+                
+                # Save updated previously downloaded video list for this playlist to file
+                with open(playlist_downloaded_file, "w") as f:
+                    json.dump(playlist_downloaded, f)
+        else: 
+            error_message = f"ERROR: Encountered None type video in playlist: {playlist['title']}"
+            print(Fore.RED + error_message + Style.RESET_ALL)
+            log_error_to_file(error_message=error_message)
 
 def add_crate_to_serato(playlist_name, directory_path):
     # Add the Serato SDK assembly to the .NET CLR
@@ -131,7 +147,7 @@ def add_tags(file_path, title, playlist_name):
     audio_file['title'] = title
     audio_file['artist'] = artist
     audio_file['genre'] = genre
-    audio_file['comment'] = f"This mp3 was downloaded from YouTube from the following playlist: {playlist_name}"
+    audio_file['comment'] = f"downloaded from playlist: {playlist_name}."
     # Save changes
     audio_file.save()
 
@@ -150,19 +166,25 @@ def download_playlists(user_name, download_dir):
 
     # Get user's public playlists
     user_playlists_url = f"https://www.youtube.com/user/{user_name}/playlists"
+    print(Fore.YELLOW + "Extracting Playlist Data Now this may take a few minutes" + Style.RESET_ALL)
     user_playlists_info = ytdl.extract_info(user_playlists_url, download=False)
 
     # Download videos from each playlist
     for playlist in user_playlists_info["entries"]:
-        print(Fore.YELLOW + f"Processing Playlist title: {playlist['title']}" + Style.RESET_ALL)
-        playlist_dir = os.path.join(download_dir, playlist["title"])
-        os.makedirs(playlist_dir, exist_ok=True)
+        if playlist is not None:
+            print(Fore.YELLOW + f"Processing Playlist title: {playlist['title']}" + Style.RESET_ALL)
+            playlist_dir = os.path.join(download_dir, playlist["title"])
+            os.makedirs(playlist_dir, exist_ok=True)
 
-        # Download videos from playlist
-        download_videos_from_pl(playlist, playlist_dir)
+            # Download videos from playlist
+            download_videos_from_pl(playlist, playlist_dir)
 
-        #add crate to serato DJ pro
-        #add_crate_to_serato("ytpg_" + playlist["title"], playlist_dir )
+            #add crate to serato DJ pro
+            #add_crate_to_serato("ytpg_" + playlist["title"], playlist_dir )
+        else: 
+            error_message = f"ERROR: Encountered None type playlist"
+            print(Fore.RED + error_message + Style.RESET_ALL)
+            log_error_to_file(error_message=error_message)
 
 def run_itunes_powershell_script(script_path, directory_path):
     try:
@@ -186,7 +208,9 @@ def run_backup_powershell_script(script_path, SourceFolderPath, DestinationFolde
         )
         print(result.stdout)
     except subprocess.CalledProcessError as e:
-        print(f"Error: Unable to update playlists")
+        error_message = f"Error: Unable to update playlists" + e.stdout
+        log_error_to_file(error_message=error_message)
+        print(error_message)
 
 if __name__ == "__main__":
     import time
@@ -202,6 +226,7 @@ if __name__ == "__main__":
     parser.add_argument("user_name", help="YouTube user name")
     parser.add_argument("--download-dir", dest="download_dir", default=default_download_dir, help="Directory to download videos to")
     args = parser.parse_args()
+    ERROR_LOGS_FILEPATH = args.download_dir + "ERROR_LOG"
 
     # Download playlists
     download_playlists(args.user_name, args.download_dir)
