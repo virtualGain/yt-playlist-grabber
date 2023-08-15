@@ -77,17 +77,21 @@ def download_videos_from_pl(playlist, playlist_dir):
                 ytdl = yt_dlp.YoutubeDL(ytdlp_opts)
                 # Download video and convert to MP3 
                 print(Fore.YELLOW + f"Processing Video title: {video['title']}" + Style.RESET_ALL)
-                ytdl.download([video['webpage_url']])
-                # Add ID3 tags to MP3
-                add_tags(mp3_file_path + ".mp3", safe_vid_title, playlist["title"])
-                # Add video ID to previously downloaded list for both the playlist and overall downloaded lists
-                playlist_downloaded.append({"video_title": safe_vid_title,
-                                            "video_id": video["id"],
-                                            "dl_date": datetime.datetime.now().strftime("%B %d, %Y %H:%M:%S")})
+                try: 
+                    ytdl.download([video['webpage_url']])
+                    # Add ID3 tags to MP3
+                    add_tags(mp3_file_path + ".mp3", safe_vid_title, playlist["title"])
+                    # Add video ID to previously downloaded list for both the playlist and overall downloaded lists
+                    playlist_downloaded.append({"video_title": safe_vid_title,
+                                                "video_id": video["id"],
+                                                "dl_date": datetime.datetime.now().strftime("%B %d, %Y %H:%M:%S")})
+                    
+                    # Save updated previously downloaded video list for this playlist to file
+                    with open(playlist_downloaded_file, "w") as f:
+                        json.dump(playlist_downloaded, f)
+                except: 
+                    print(Fore.RED + f"Failed processing video: {video['title']}" + Style.RESET_ALL)
                 
-                # Save updated previously downloaded video list for this playlist to file
-                with open(playlist_downloaded_file, "w") as f:
-                    json.dump(playlist_downloaded, f)
         else: 
             error_message = f"ERROR: Encountered None type video in playlist: {playlist['title']}"
             print(Fore.RED + error_message + Style.RESET_ALL)
