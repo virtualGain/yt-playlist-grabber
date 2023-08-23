@@ -65,6 +65,7 @@ def download_videos_from_pl(playlist, playlist_dir):
                 #reinit ytdl with updated path. Only way to sanitize filenames
                 ytdlp_opts = {
                     "format": "bestaudio[ext=m4a]/bestaudio",
+                    "sleep_interval": 2,
                     "postprocessors": [{
                         "key": "FFmpegExtractAudio",
                         "preferredcodec": "mp3",
@@ -77,6 +78,7 @@ def download_videos_from_pl(playlist, playlist_dir):
                 ytdl = yt_dlp.YoutubeDL(ytdlp_opts)
                 # Download video and convert to MP3 
                 print(Fore.YELLOW + f"Processing Video title: {video['title']}" + Style.RESET_ALL)
+                print(Fore.YELLOW + f"Video URL: {video['webpage_url']}" + Style.RESET_ALL)
                 try: 
                     ytdl.download([video['webpage_url']])
                     # Add ID3 tags to MP3
@@ -155,7 +157,7 @@ def add_tags(file_path, title, playlist_name):
     # Save changes
     audio_file.save()
 
-def download_playlists(user_name, download_dir):
+def download_playlists(user_name, download_dir, playlist_title):
     ytdlp_opts = {
             "format": "bestaudio[ext=m4a]/bestaudio",
             "postprocessors": [{
